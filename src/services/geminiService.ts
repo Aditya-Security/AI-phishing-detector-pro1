@@ -1,12 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const apiKey = process.env.GEMINI_API_KEY;
-
-if (!apiKey || apiKey === 'undefined') {
-  console.warn("GEMINI_API_KEY is missing. Please set it in your environment variables.");
-}
-
-const ai = new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export interface PhishingAnalysis {
   riskScore: number;
