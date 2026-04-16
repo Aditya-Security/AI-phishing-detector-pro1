@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 export interface PhishingAnalysis {
   riskScore: number;
@@ -19,7 +19,7 @@ export interface PhishingAnalysis {
 
 export async function analyzeEmail(emailContent: string): Promise<PhishingAnalysis> {
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-2.0-flash",
     contents: `Analyze the following email artifact for phishing indicators and provide a detailed SOC report.
     
     Email Content:
@@ -83,7 +83,7 @@ export async function analyzeEmail(emailContent: string): Promise<PhishingAnalys
     },
   });
 
-  const text = response.text;
+  const text = response.text();
   if (!text) {
     throw new Error("Failed to get analysis from AI.");
   }
