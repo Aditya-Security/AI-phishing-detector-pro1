@@ -1,68 +1,52 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
-
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).end();
 
   const { emailContent } = req.body;
   if (!emailContent) return res.status(400).json({ error: "No email content" });
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: `Analyze the following email artifact for phishing indicators and provide a detailed SOC report.
-      
-      Email Content:
-      """
-      ${emailContent}
-      """`,
-      config: {
-        systemInstruction: `You are an advanced SOC analyst powering "AI Phishing Detector Pro".
-        
-        Instructions:
-        1. Assign a Phishing Risk Score (0-100).
-        2. Provide a Verdict: Safe, Suspicious, or High Risk.
-        3. Identify the Attack Type.
-        4. Break down: Threat Indicators, Social Engineering Techniques, Technical Analysis, Language & Tone Analysis.
-        5. Extract all URLs and email addresses found.
-        6. Provide a Final Analyst Summary.
-        7. Provide a Recommended Action.
-        8. Provide 3-5 User Recommendations for a regular user.
-        
-        Scoring: 0-30 Safe, 31-69 Suspicious, 70-100 High Risk.
-        Return JSON only.`,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            riskScore: { type: Type.NUMBER },
-            verdict: { type: Type.STRING, enum: ["Safe", "Suspicious", "High Risk"] },
-            attackType: { type: Type.STRING },
-            threatIndicators: { type: Type.ARRAY, items: { type: Type.STRING } },
-            socialEngineeringTechniques: { type: Type.ARRAY, items: { type: Type.STRING } },
-            technicalAnalysis: { type: Type.STRING },
-            languageToneAnalysis: { type: Type.STRING },
-            extractedUrls: { type: Type.ARRAY, items: { type: Type.STRING } },
-            extractedEmails: { type: Type.ARRAY, items: { type: Type.STRING } },
-            analystSummary: { type: Type.STRING },
-            recommendedAction: { type: Type.STRING },
-            userRecommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: [
-            "riskScore", "verdict", "attackType", "threatIndicators",
-            "socialEngineeringTechniques", "technicalAnalysis", "languageToneAnalysis",
-            "extractedUrls", "extractedEmails", "analystSummary",
-            "recommendedAction", "userRecommendations"
-          ],
-        },
-      },
-    });
+  const apiKey = process.env.VITE_GEMINI_API_KEY;
 
-    const text = response.text();
-    res.status(200).json(JSON.parse(text));
-  } catch (error) {
-    console.error("Gemini API error:", error);
-    res.status(500).json({ error: "Analysis failed" });
+  try {
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Analyze this email for phishing. Return ONLY valid JSON with these exact fields: riskScore (number 0-100), verdict (exactly "Safe" or "Suspicious" or "High Risk"), attackType (string), threatIndicators (array of strings), socialEngineeringTechniques (array of strings), technicalAnalysis (string), languageToneAnalysis (string), extractedUrls (array of strings), extractedEmails (array of strings), analystSummary (string), recommendedAction (string), userRecommendations (array of 3-5 strings).
+
+Scoring rules: 0-30 = Safe, 31-69 = Suspicious, 70-100 = High Risk.
+
+Email to analyze:
+"""
+${emailContent}
+"""`
+            }]
+          }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        })
+      }
+    );
+
+    const data = await geminiRes.json();
+    
+    if (!geminiRes.ok) {
+      console.error("Gemini error:", JSON.stringify(data));
+      return res.status(500).json({ error: "Gemini API error", details: data });
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return res.status(500).json({ error: "Empty response from Gemini" });
+
+    const parsed = JSON.parse(text);
+    res.status(200).json(parsed);
+
+  } catch (error: any) {
+    console.error("Handler error:", error);
+    res.status(500).json({ error: error.message });
   }
 }
