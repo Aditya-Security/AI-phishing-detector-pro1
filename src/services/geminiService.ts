@@ -1,6 +1,6 @@
 export interface PhishingAnalysis {
   riskScore: number;
-  verdict: "Safe" | "Suspicious" | "High Risk";
+  verdict: 'Safe' | 'Suspicious' | 'High Risk';
   attackType: string;
   threatIndicators: string[];
   socialEngineeringTechniques: string[];
@@ -14,13 +14,16 @@ export interface PhishingAnalysis {
 }
 
 export async function analyzeEmail(emailContent: string): Promise<PhishingAnalysis> {
-  const response = await fetch("/api/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const response = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ emailContent }),
   });
 
-  if (!response.ok) throw new Error("Analysis failed");
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(err.error || 'Analysis failed');
+  }
 
   return response.json();
 }
